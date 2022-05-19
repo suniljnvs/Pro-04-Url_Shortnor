@@ -31,12 +31,13 @@ const isValid = function (value) {
     return true;
 }
 
-
+//===============================< create url/shorten >===============================================
 
 const createShortUrl = async function (req, res) {
     try {
 
         const longUrl = req.body.longUrl;
+
         if (!isValid(longUrl)) {
             return res.status(400).send({ status: false, message: "Please provide LongURL." });
         }
@@ -45,13 +46,14 @@ const createShortUrl = async function (req, res) {
         }
 
         const cachedLongUrl = await GET_ASYNC(`${longUrl}`)
+
         if (cachedLongUrl) {
             return res.status(200).send({ status: true, data: cachedLongUrl })
         }
 
 
-
         const longUrlIntoDB = await urlModel.findOne({ longUrl: longUrl }).select({ _id: 0, longUrl: 1, shortUrl: 1, urlCode: 1 })
+        
         if (longUrlIntoDB) {
             await SET_ASYNC(`${longUrl}`, JSON.stringify(longUrlIntoDB))
             return res.status(200).send({ status: true, msg: "Short URL already exists", data: longUrlIntoDB });
@@ -84,14 +86,15 @@ const createShortUrl = async function (req, res) {
 
 
 
-
+//=================================< GET /:urlCode >=============================================
 
 
 const getUrlCode = async function (req, res) {
     try {
         const urlCode = req.params.urlCode
 
-        const cachedUrlCode = await GET_ASYNC(`${urlCode}`)
+//
+        const cachedUrlCode = await GET_ASYNC(`${urlCode}`) //finding data in cache memory
         const data = JSON.parse(cachedUrlCode)
 
         if (data) {
@@ -101,15 +104,14 @@ const getUrlCode = async function (req, res) {
         }
         else {
 
-            const findUrlCode = await urlModel.findOne({ urlCode: urlCode });
-
+            const findUrlCode = await urlModel.findOne({ urlCode: urlCode }); //finding the urlCode in urlModel
 
             if (!findUrlCode) {
 
                 return res.status(404).send({ status: false, msg: "No url found with this urlCode" })
 
             }
-            await SET_ASYNC(`${urlCode}`, JSON.stringify(findUrlCode))
+            await SET_ASYNC(`${urlCode}`, JSON.stringify(findUrlCode))  //setting the data in cache
             return res.status(307).redirect(findUrlCode.longUrl)
 
         }
