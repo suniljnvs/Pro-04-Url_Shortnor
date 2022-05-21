@@ -7,11 +7,11 @@ const { promisify } = require("util");
 
 // Connect to redis
 const redisClient = redis.createClient(
-    13190,
-    "redis-13190.c301.ap-south-1-1.ec2.cloud.redislabs.com",
+    11084,
+    "redis-11084.c264.ap-south-1-1.ec2.cloud.redislabs.com",
     { no_ready_check: true }
 );
-redisClient.auth("gkiOIPkytPI3ADi14jHMSWkZEo2J5TDG", function (err) {
+redisClient.auth("PMxAl8ifXJwbABuMKPPUhJhNjTPf8XbX", function (err) {
     if (err) throw err;
 });
 
@@ -38,9 +38,11 @@ const createShortUrl = async function (req, res) {
 
         const longUrl = req.body.longUrl;
 
+        //Check req.body  is empty or not....
         if (!isValid(longUrl)) {
             return res.status(400).send({ status: false, message: "Please provide LongURL." });
         }
+        // Check validation for given long Url...
         if (!(validUrl.isWebUri(longUrl))) {
             return res.status(400).send({ status: false, message: "Url is not valid" });
         }
@@ -50,10 +52,9 @@ const createShortUrl = async function (req, res) {
         if (cachedLongUrl) {
             return res.status(200).send({ status: true, data: cachedLongUrl })
         }
-
-
         const longUrlIntoDB = await urlModel.findOne({ longUrl: longUrl }).select({ _id: 0, longUrl: 1, shortUrl: 1, urlCode: 1 })
         
+        // Set the documents in cache memory........
         if (longUrlIntoDB) {
             await SET_ASYNC(`${longUrl}`, JSON.stringify(longUrlIntoDB))
             return res.status(200).send({ status: true, msg: "Short URL already exists", data: longUrlIntoDB });
@@ -61,24 +62,18 @@ const createShortUrl = async function (req, res) {
 
         const baseUrl = "http://localhost:3000";
 
+        // Generate Url code .....
         const urlCode = shortid.generate()
 
         const shortUrl = baseUrl + '/' + urlCode;
         const urlData = { longUrl, shortUrl, urlCode };
 
+        // Create the Url code .....
         const newUrl = await urlModel.create(urlData)
 
-        const urlShorten = {
-            urlCode: newUrl.urlCode,
-            longUrl: newUrl.longUrl,
-            shortUrl: newUrl.shortUrl
-        }
-
-
-        return res.status(201).send({ status: true, msg: "url is shorten", data: urlShorten, });
+        return res.status(201).send({ status: true, msg: "url is shorten", data: newUrl, });
     }
     catch (error) {
-        console.log(error)
         return res.status(500).send({ status: false, msg: error.message })
     }
 }
@@ -93,30 +88,26 @@ const getUrlCode = async function (req, res) {
     try {
         const urlCode = req.params.urlCode
 
-//
-        const cachedUrlCode = await GET_ASYNC(`${urlCode}`) //finding data in cache memory
+        //finding data in cache memory
+        const cachedUrlCode = await GET_ASYNC(`${urlCode}`) 
         const data = JSON.parse(cachedUrlCode)
 
         if (data) {
-
             res.status(307).redirect(data.longUrl)
-
         }
+        //finding the urlCode in urlModel
         else {
-
-            const findUrlCode = await urlModel.findOne({ urlCode: urlCode }); //finding the urlCode in urlModel
-
-            if (!findUrlCode) {
-
-                return res.status(404).send({ status: false, msg: "No url found with this urlCode" })
-
+            const findUrlCode = await urlModel.findOne({ urlCode: urlCode }); 
+            
+            if (findUrlCode) {
+                res.status(307).redirect(findUrlCode.longUrl)
             }
-            await SET_ASYNC(`${urlCode}`, JSON.stringify(findUrlCode))  //setting the data in cache
-            return res.status(307).redirect(findUrlCode.longUrl)
-
+            else {
+                return res.status(404).send({ status: false, msg: "No Documents found with this urlCode" })
+            }
+        
         }
     }
-
     catch (err) {
         console.log(err)
         return res.status(500).send({ status: true, message: err.message })
